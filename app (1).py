@@ -229,7 +229,7 @@ with tab_home:
             "The product stopped working after two days.",
 
         "Neutral example":
-            "The product is average and works as expected."
+            "The product is average."
     }
 
     choice = st.selectbox(
