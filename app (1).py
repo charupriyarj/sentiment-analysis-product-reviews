@@ -12,7 +12,6 @@ import streamlit as st
 MODEL_PATH = "sentiment_pipeline.joblib"
 METRICS_PATH = "metrics.json"
 CONFUSION_PATH = "confusion_matrix.png"
-DISTRIBUTION_PATH = "class_distribution.png"
 
 st.set_page_config(
     page_title="ReviewSense AI",
@@ -260,7 +259,6 @@ with tab_home:
             try:
                 prediction = str(model.predict([review])[0])
 
-                # Use probabilities only when the model supports them.
                 if hasattr(model, "predict_proba"):
                     probabilities = model.predict_proba([review])[0]
                     classes = list(model.classes_)
@@ -278,7 +276,6 @@ with tab_home:
                     confidence = None
                     probability_df = None
 
-                # Save result in session history.
                 st.session_state.last_result = {
                     "review": review,
                     "prediction": prediction,
@@ -293,7 +290,6 @@ with tab_home:
                     }
                 )
 
-                # Keep the latest 10 reviews only.
                 st.session_state.history = (
                     st.session_state.history[:10]
                 )
@@ -301,7 +297,10 @@ with tab_home:
             except Exception as error:
                 st.error(f"Prediction failed: {error}")
 
-    # Keep results visible after Streamlit reruns.
+    # =================================================
+    # DISPLAY PREDICTION RESULT
+    # =================================================
+
     result = st.session_state.last_result
 
     if result is not None:
@@ -348,6 +347,7 @@ with tab_home:
         )
 
         if confidence is not None:
+
             col1, col2 = st.columns(2)
 
             col1.metric(
@@ -370,30 +370,11 @@ with tab_home:
             hasattr(model, "predict_proba")
             and probability_df is not None
         ):
+
             st.subheader("📊 Sentiment Probability")
 
             st.bar_chart(
                 probability_df.set_index("Sentiment")
-            )
-
-        # =================================================
-        # SENTIMENT DISTRIBUTION
-        # =================================================
-
-        st.divider()
-        st.subheader("📊 Dataset Sentiment Distribution")
-
-        if os.path.exists(DISTRIBUTION_PATH):
-            st.image(
-                DISTRIBUTION_PATH,
-                caption="Sentiment distribution in the dataset",
-                use_container_width=True
-            )
-        else:
-            st.info(
-                "The class_distribution.png file is not available. "
-                "Add the existing dataset distribution chart to your "
-                "repository to display it here."
             )
 
 # =====================================================
@@ -439,6 +420,7 @@ with tab_history:
 with tab_performance:
 
     st.subheader("📈 Model Performance")
+
     st.write(
         "These metrics summarize the trained model's performance "
         "on the held-out test dataset."
@@ -446,7 +428,6 @@ with tab_performance:
 
     if metrics is not None:
 
-        # First row
         c1, c2, c3, c4 = st.columns(4)
 
         c1.metric(
@@ -469,7 +450,6 @@ with tab_performance:
             f"{metrics['macro_f1'] * 100:.2f}%"
         )
 
-        # Second row
         c5, c6, c7 = st.columns(3)
 
         c5.metric(
@@ -502,16 +482,18 @@ with tab_performance:
     st.subheader("🧮 Confusion Matrix")
 
     if os.path.exists(CONFUSION_PATH):
+
         st.image(
             CONFUSION_PATH,
             caption="Confusion matrix from model evaluation",
             use_container_width=True
         )
+
     else:
         st.info(
             "The confusion_matrix.png file is not available. "
-            "Add the existing confusion matrix image to your "
-            "repository to display it here."
+            "Add the confusion matrix image to your repository "
+            "to display it here."
         )
 
 # =====================================================
