@@ -8,188 +8,174 @@ import streamlit as st
 MODEL_PATH = "sentiment_pipeline.joblib"
 METRICS_PATH = "metrics.json"
 
+# ---------------- PAGE CONFIGURATION ----------------
+
 st.set_page_config(
     page_title="ReviewSense AI",
-    page_icon="🛍️",
+    page_icon="📝",
     layout="wide"
 )
 
-# Custom styling
-st.markdown("""
-<style>
-.stApp {
-    background-color: #F4F7FC;
-}
+# ---------------- CUSTOM DESIGN ----------------
 
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #F4F7FC;
+    }
 
-.hero {
-    background: linear-gradient(120deg, #102A43, #1D4E89);
-    padding: 30px;
-    border-radius: 18px;
-    color: white;
-    margin-bottom: 25px;
-}
+    h1 {
+        color: #102A43;
+    }
 
-.hero h1 {
-    color: white;
-    font-size: 36px;
-}
+    h2, h3 {
+        color: #163A63;
+    }
 
-.hero p {
-    color: #E3EEFF;
-    font-size: 17px;
-}
+    .main-title {
+        background: linear-gradient(90deg, #102A43, #1976D2);
+        padding: 25px;
+        border-radius: 15px;
+        color: white;
+        margin-bottom: 20px;
+    }
 
-div.stButton > button {
-    background-color: #173F70;
-    color: white;
-    border-radius: 10px;
-    border: none;
-    padding: 10px 22px;
-    font-weight: bold;
-}
+    .main-title h1 {
+        color: white;
+        margin-bottom: 8px;
+    }
 
-div.stButton > button:hover {
-    background-color: #245A91;
-    color: white;
-}
+    .main-title p {
+        color: #EAF4FF;
+        margin-bottom: 0;
+    }
 
-div[data-testid="stMetric"] {
-    background-color: white;
-    padding: 18px;
-    border-radius: 12px;
-    border: 1px solid #DCE6F1;
-}
+    .result-box {
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border-left: 5px solid #1976D2;
+        margin-top: 15px;
+    }
 
-</style>
-""", unsafe_allow_html=True)
+    div.stButton > button {
+        background-color: #1565C0;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+    }
 
+    div.stButton > button:hover {
+        background-color: #0D47A1;
+        color: white;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------------- HEADER ----------------
+
+st.markdown(
+    """
+    <div class="main-title">
+        <h1>📝 ReviewSense AI</h1>
+        <p>Sentiment Analysis of Product Reviews</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.write(
+    "Analyze product reviews using a trained machine learning model "
+    "to identify Positive, Negative, or Neutral sentiment."
+)
+
+st.divider()
+
+# ---------------- LOAD MODEL ----------------
 
 @st.cache_resource
 def load_model():
     return joblib.load(MODEL_PATH)
 
 
-# Header
-st.markdown("""
-<div class="hero">
-    <h1>🛍️ ReviewSense AI</h1>
-    <p>
-        Understand customer opinions through
-        Natural Language Processing and Machine Learning.
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
 if not os.path.exists(MODEL_PATH):
     st.error(
-        f"Model file '{MODEL_PATH}' not found. "
-        "Please check your GitHub repository."
+        f"Model file '{MODEL_PATH}' was not found. "
+        "Please check that it exists in your GitHub repository."
     )
     st.stop()
 
-model = load_model()
-# Load and display model performance metrics
-st.divider()
-st.header("📊 Model Performance")
+try:
+    model = load_model()
+except Exception as error:
+    st.error(f"Unable to load the model: {error}")
+    st.stop()
 
-METRICS_PATH = "metrics.json"
+# ---------------- REVIEW INPUT ----------------
 
-if os.path.exists(METRICS_PATH):
-    with open(METRICS_PATH, "r") as file:
-        metrics = json.load(file)
+st.header("🔍 Analyze a Product Review")
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("Accuracy", f"{metrics['accuracy'] * 100:.2f}%")
-    col2.metric("Macro Precision", f"{metrics['macro_precision'] * 100:.2f}%")
-    col3.metric("Macro Recall", f"{metrics['macro_recall'] * 100:.2f}%")
-    col4.metric("Macro F1-Score", f"{metrics['macro_f1'] * 100:.2f}%")
-
-    col5, col6, col7 = st.columns(3)
-
-    col5.metric("Weighted Precision",
-                f"{metrics['weighted_precision'] * 100:.2f}%")
-    col6.metric("Weighted Recall",
-                f"{metrics['weighted_recall'] * 100:.2f}%")
-    col7.metric("Weighted F1-Score",
-                f"{metrics['weighted_f1'] * 100:.2f}%")
-
-    st.caption(
-        f"Training samples: {metrics['n_train']:,} | "
-        f"Testing samples: {metrics['n_test']:,}"
-    )
-else:
-    st.warning("Performance metrics file (metrics.json) was not found.")
-
-# Dashboard introduction
-st.subheader("📊 Review Analysis Dashboard")
-st.write(
-    "Enter a product review below to explore its predicted sentiment."
-)
-
-col1, col2 = st.columns([3, 2])
+left_col, right_col = st.columns([3, 2])
 
 EXAMPLES = {
-    "Positive example": (
-        "The product quality is excellent and delivery was fast."
-    ),
-    "Negative example": (
-        "The product stopped working after two days."
-    ),
-    "Neutral example": (
+    "Positive example":
+        "The product quality is excellent and delivery was fast.",
+
+    "Negative example":
+        "The product stopped working after two days.",
+
+    "Neutral example":
         "The product is average and works as expected."
-    ),
 }
 
-with col1:
-    st.markdown("### ✍️ Analyze a Review")
-
+with left_col:
     choice = st.selectbox(
-        "Try a sample review",
-        ["-- Write my own --"] + list(EXAMPLES.keys())
+        "Choose an example or write your own",
+        ["-- Write my own review --"] + list(EXAMPLES.keys())
     )
 
     default_text = EXAMPLES.get(choice, "")
 
     review = st.text_area(
-        "Product review",
+        "Enter your product review:",
         value=default_text,
-        height=160,
-        placeholder="Type or paste a product review here..."
+        height=150,
+        placeholder="Type your product review here..."
     )
 
     predict_clicked = st.button(
-        "🔍 Analyze Sentiment",
+        "🔎 Predict Sentiment",
         type="primary",
         use_container_width=True
     )
 
-with col2:
-    st.markdown("### 💡 What this app does")
+with right_col:
+    st.subheader("How it works")
 
-    st.info(
-        "This application uses a trained machine learning "
-        "pipeline to classify product reviews."
+    st.write(
+        "1. Enter a product review.\n\n"
+        "2. Click Predict Sentiment.\n\n"
+        "3. View the predicted sentiment.\n\n"
+        "4. Explore the probability chart and model performance."
     )
 
-    st.markdown("""
-    **Available sentiment classes**
-    
-    😊 Positive
-    
-    😐 Neutral
-    
-    😞 Negative
-    """)
+    st.info(
+        "The prediction is generated by your trained machine learning model."
+    )
+
+# ---------------- PREDICTION RESULTS ----------------
 
 if predict_clicked:
+
     if not review.strip():
-        st.warning("Please enter a review first.")
+        st.warning("Please enter a review before predicting.")
+
     else:
         try:
             pred = model.predict([review])[0]
@@ -201,39 +187,117 @@ if predict_clicked:
                 "Neutral": "😐"
             }
 
-            st.markdown("---")
-            st.subheader("📌 Analysis Result")
+            icon = icons.get(str(pred), "📊")
 
-            st.metric(
-                "Predicted Sentiment",
-                f"{icons.get(str(pred), '📝')} {pred}"
+            st.divider()
+            st.header("📌 Prediction Results")
+
+            st.markdown(
+                f"""
+                <div class="result-box">
+                    <h3>Predicted Sentiment: {icon} {pred}</h3>
+                    <p>Your review has been analyzed by the trained model.</p>
+                </div>
+                """,
+                unsafe_allow_html=True
             )
+
+            # ---------------- PROBABILITY CHART ----------------
+
+            st.subheader("📊 Sentiment Probability")
 
             probs = pd.DataFrame({
                 "Sentiment": model.classes_,
                 "Probability": proba
             })
 
-            probs["Probability (%)"] = (
-                probs["Probability"] * 100
-            ).round(2)
+            probs["Probability (%)"] = probs["Probability"] * 100
 
-            st.markdown("#### Sentiment Probability")
             st.bar_chart(
-                probs.set_index("Sentiment")["Probability"]
+                probs.set_index("Sentiment")["Probability (%)"]
             )
 
             st.caption(
-                "Probabilities represent the model's estimates, "
-                "not guaranteed correctness."
+                "These probabilities represent the model's estimated "
+                "confidence for each sentiment class. They are not guarantees."
             )
 
-        except Exception as e:
-            st.error(f"Prediction failed: {e}")
+            # ---------------- PERFORMANCE METRICS ----------------
 
-# Footer
-st.markdown("---")
+            st.divider()
+            st.header("📈 Model Performance")
+
+            if os.path.exists(METRICS_PATH):
+
+                with open(METRICS_PATH, "r") as file:
+                    metrics = json.load(file)
+
+                st.write(
+                    "These metrics summarize the model's performance "
+                    "on its evaluation dataset. They do not change "
+                    "for each individual review."
+                )
+
+                # First row: macro metrics and accuracy
+                col1, col2, col3, col4 = st.columns(4)
+
+                col1.metric(
+                    "Accuracy",
+                    f"{metrics['accuracy'] * 100:.2f}%"
+                )
+
+                col2.metric(
+                    "Macro Precision",
+                    f"{metrics['macro_precision'] * 100:.2f}%"
+                )
+
+                col3.metric(
+                    "Macro Recall",
+                    f"{metrics['macro_recall'] * 100:.2f}%"
+                )
+
+                col4.metric(
+                    "Macro F1-Score",
+                    f"{metrics['macro_f1'] * 100:.2f}%"
+                )
+
+                # Second row: weighted metrics
+                col5, col6, col7 = st.columns(3)
+
+                col5.metric(
+                    "Weighted Precision",
+                    f"{metrics['weighted_precision'] * 100:.2f}%"
+                )
+
+                col6.metric(
+                    "Weighted Recall",
+                    f"{metrics['weighted_recall'] * 100:.2f}%"
+                )
+
+                col7.metric(
+                    "Weighted F1-Score",
+                    f"{metrics['weighted_f1'] * 100:.2f}%"
+                )
+
+                st.caption(
+                    f"Training samples: {metrics['n_train']:,} | "
+                    f"Testing samples: {metrics['n_test']:,}"
+                )
+
+            else:
+                st.warning(
+                    "The metrics.json file was not found. "
+                    "Please check that it exists in your repository."
+                )
+
+        except Exception as error:
+            st.error(f"An error occurred while analyzing the review: {error}")
+
+# ---------------- FOOTER ----------------
+
+st.divider()
+
 st.caption(
-    "ReviewSense AI | Product Review Sentiment Analysis | "
-    "Built with Python, Scikit-learn and Streamlit"
+    "ReviewSense AI | Sentiment Analysis of Product Reviews | "
+    "Machine Learning Mini Project"
 )
