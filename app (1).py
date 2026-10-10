@@ -8,56 +8,200 @@ import streamlit as st
 MODEL_PATH = "sentiment_pipeline.joblib"
 METRICS_PATH = "metrics.json"
 
-st.set_page_config(page_title="Product Review Sentiment Analyzer", page_icon="📝")
+st.set_page_config(
+    page_title="ReviewSense AI",
+    page_icon="🛍️",
+    layout="wide"
+)
+
+# Custom styling
+st.markdown("""
+<style>
+.stApp {
+    background-color: #F4F7FC;
+}
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+.hero {
+    background: linear-gradient(120deg, #102A43, #1D4E89);
+    padding: 30px;
+    border-radius: 18px;
+    color: white;
+    margin-bottom: 25px;
+}
+
+.hero h1 {
+    color: white;
+    font-size: 36px;
+}
+
+.hero p {
+    color: #E3EEFF;
+    font-size: 17px;
+}
+
+div.stButton > button {
+    background-color: #173F70;
+    color: white;
+    border-radius: 10px;
+    border: none;
+    padding: 10px 22px;
+    font-weight: bold;
+}
+
+div.stButton > button:hover {
+    background-color: #245A91;
+    color: white;
+}
+
+div[data-testid="stMetric"] {
+    background-color: white;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #DCE6F1;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_resource
 def load_model():
-    """Load the saved pipeline once (not retrained on every start)."""
     return joblib.load(MODEL_PATH)
 
 
-st.title("📝 Sentiment Analysis of Product Reviews")
-st.write("Type a product review and the trained model will predict whether it is "
-         "**Positive**, **Negative** or **Neutral**.")
+# Header
+st.markdown("""
+<div class="hero">
+    <h1>🛍️ ReviewSense AI</h1>
+    <p>
+        Understand customer opinions through
+        Natural Language Processing and Machine Learning.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 if not os.path.exists(MODEL_PATH):
-    st.error(f"Model file '{MODEL_PATH}' not found. Run train.py first and "
-             "place the generated file next to app.py.")
+    st.error(
+        f"Model file '{MODEL_PATH}' not found. "
+        "Please check your GitHub repository."
+    )
     st.stop()
 
 model = load_model()
 
-EXAMPLES = {
-    "Positive example": "The product quality is excellent and delivery was fast.",
-    "Negative example": "The product stopped working after two days.",
-    "Neutral example": "The product is average and works as expected.",
-}
-choice = st.selectbox("Try an example (optional)", ["-- write my own --"] + list(EXAMPLES))
-default_text = EXAMPLES.get(choice, "")
-review = st.text_area("Enter a product review:", value=default_text, height=150)
+# Dashboard introduction
+st.subheader("📊 Review Analysis Dashboard")
+st.write(
+    "Enter a product review below to explore its predicted sentiment."
+)
 
-if st.button("Predict Sentiment", type="primary"):
+col1, col2 = st.columns([3, 2])
+
+EXAMPLES = {
+    "Positive example": (
+        "The product quality is excellent and delivery was fast."
+    ),
+    "Negative example": (
+        "The product stopped working after two days."
+    ),
+    "Neutral example": (
+        "The product is average and works as expected."
+    ),
+}
+
+with col1:
+    st.markdown("### ✍️ Analyze a Review")
+
+    choice = st.selectbox(
+        "Try a sample review",
+        ["-- Write my own --"] + list(EXAMPLES.keys())
+    )
+
+    default_text = EXAMPLES.get(choice, "")
+
+    review = st.text_area(
+        "Product review",
+        value=default_text,
+        height=160,
+        placeholder="Type or paste a product review here..."
+    )
+
+    predict_clicked = st.button(
+        "🔍 Analyze Sentiment",
+        type="primary",
+        use_container_width=True
+    )
+
+with col2:
+    st.markdown("### 💡 What this app does")
+
+    st.info(
+        "This application uses a trained machine learning "
+        "pipeline to classify product reviews."
+    )
+
+    st.markdown("""
+    **Available sentiment classes**
+    
+    😊 Positive
+    
+    😐 Neutral
+    
+    😞 Negative
+    """)
+
+if predict_clicked:
     if not review.strip():
         st.warning("Please enter a review first.")
     else:
-        pred = model.predict([review])[0]
-        proba = model.predict_proba([review])[0]
-        icon = {"Positive": "😊", "Negative": "😞", "Neutral": "😐"}.get(pred, "")
-        st.subheader(f"Predicted Sentiment: {pred} {icon}")
-        probs = pd.DataFrame({"Sentiment": model.classes_, "Probability": proba})
-        st.bar_chart(probs.set_index("Sentiment"))
-        st.caption("Probabilities show the model's confidence; they are not guarantees.")
+        try:
+            pred = model.predict([review])[0]
+            proba = model.predict_proba([review])[0]
 
-with st.expander("Model performance (on held-out test data)"):
-    if os.path.exists(METRICS_PATH):
-        with open(METRICS_PATH) as f:
-            m = json.load(f)
-        st.write(f"Accuracy: **{m['accuracy']:.3f}**  |  "
-                 f"Macro F1: **{m['macro_f1']:.3f}**  |  "
-                 f"Test reviews: {m['n_test']}")
-    else:
-        st.write("metrics.json not found.")
+            icons = {
+                "Positive": "😊",
+                "Negative": "😞",
+                "Neutral": "😐"
+            }
 
-st.caption("Model: TF-IDF + Logistic Regression. Labels derived from star ratings "
-           "(1-2 Negative, 3 Neutral, 4-5 Positive).")
+            st.markdown("---")
+            st.subheader("📌 Analysis Result")
+
+            st.metric(
+                "Predicted Sentiment",
+                f"{icons.get(str(pred), '📝')} {pred}"
+            )
+
+            probs = pd.DataFrame({
+                "Sentiment": model.classes_,
+                "Probability": proba
+            })
+
+            probs["Probability (%)"] = (
+                probs["Probability"] * 100
+            ).round(2)
+
+            st.markdown("#### Sentiment Probability")
+            st.bar_chart(
+                probs.set_index("Sentiment")["Probability"]
+            )
+
+            st.caption(
+                "Probabilities represent the model's estimates, "
+                "not guaranteed correctness."
+            )
+
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")
+
+# Footer
+st.markdown("---")
+st.caption(
+    "ReviewSense AI | Product Review Sentiment Analysis | "
+    "Built with Python, Scikit-learn and Streamlit"
+)
