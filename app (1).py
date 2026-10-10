@@ -93,6 +93,38 @@ if not os.path.exists(MODEL_PATH):
     st.stop()
 
 model = load_model()
+# Load and display model performance metrics
+st.divider()
+st.header("📊 Model Performance")
+
+METRICS_PATH = "metrics.json"
+
+if os.path.exists(METRICS_PATH):
+    with open(METRICS_PATH, "r") as file:
+        metrics = json.load(file)
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Accuracy", f"{metrics['accuracy'] * 100:.2f}%")
+    col2.metric("Macro Precision", f"{metrics['macro_precision'] * 100:.2f}%")
+    col3.metric("Macro Recall", f"{metrics['macro_recall'] * 100:.2f}%")
+    col4.metric("Macro F1-Score", f"{metrics['macro_f1'] * 100:.2f}%")
+
+    col5, col6, col7 = st.columns(3)
+
+    col5.metric("Weighted Precision",
+                f"{metrics['weighted_precision'] * 100:.2f}%")
+    col6.metric("Weighted Recall",
+                f"{metrics['weighted_recall'] * 100:.2f}%")
+    col7.metric("Weighted F1-Score",
+                f"{metrics['weighted_f1'] * 100:.2f}%")
+
+    st.caption(
+        f"Training samples: {metrics['n_train']:,} | "
+        f"Testing samples: {metrics['n_test']:,}"
+    )
+else:
+    st.warning("Performance metrics file (metrics.json) was not found.")
 
 # Dashboard introduction
 st.subheader("📊 Review Analysis Dashboard")
