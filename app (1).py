@@ -1,28 +1,67 @@
 import json
 import os
-
 import joblib
 import pandas as pd
 import streamlit as st
 
-# =====================================================
-# CONFIGURATION
-# =====================================================
+
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
+
+st.set_page_config(
+    page_title="ReviewSense AI",
+    page_icon="📊",
+    layout="wide"
+)
+
+
+# =========================================================
+# FILE PATHS
+# =========================================================
 
 MODEL_PATH = "sentiment_pipeline.joblib"
 METRICS_PATH = "metrics.json"
 CONFUSION_PATH = "confusion_matrix.png"
 DISTRIBUTION_PATH = "class_distribution.png"
 
-st.set_page_config(
-    page_title="ReviewSense AI",
-    page_icon="🛍️",
-    layout="wide"
-)
 
-# =====================================================
+# =========================================================
+# LOAD MODEL
+# =========================================================
+
+@st.cache_resource
+def load_model():
+    if not os.path.exists(MODEL_PATH):
+        return None
+
+    return joblib.load(MODEL_PATH)
+
+
+model = load_model()
+
+
+# =========================================================
+# LOAD MODEL METRICS
+# =========================================================
+
+def load_metrics():
+    if os.path.exists(METRICS_PATH):
+        try:
+            with open(METRICS_PATH, "r") as file:
+                return json.load(file)
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    return {}
+
+
+metrics = load_metrics()
+
+
+# =========================================================
 # SESSION STATE
-# =====================================================
+# =========================================================
 
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -30,384 +69,398 @@ if "history" not in st.session_state:
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
 
-# =====================================================
-# CUSTOM CSS
-# =====================================================
+
+# =========================================================
+# EXAMPLE REVIEWS
+# =========================================================
+
+example_reviews = {
+    "Positive Review": (
+        "This product is amazing! The quality is excellent "
+        "and it works perfectly. I am very happy with it."
+    ),
+    "Negative Review": (
+        "Very disappointed with this product. The quality "
+        "is poor and it stopped working after two days."
+    ),
+    "Neutral Review": (
+        "The product arrived today. It looks as described "
+        "and has the features mentioned in the listing."
+    )
+}
+
+
+# =========================================================
+# MAIN HEADER
+# =========================================================
+
+st.title("📊 ReviewSense AI")
 
 st.markdown(
     """
-    <style>
-    .stApp {
-        background-color: #F4F7FC;
-    }
+    ### Sentiment Analysis of Product Reviews
 
-    .block-container {
-        max-width: 1150px;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-
-    .hero {
-        background: linear-gradient(135deg, #102A43, #1976D2);
-        padding: 30px;
-        border-radius: 18px;
-        margin-bottom: 20px;
-    }
-
-    .hero h1 {
-        color: white;
-        font-size: 2.2rem;
-        margin-bottom: 8px;
-    }
-
-    .hero p {
-        color: #EAF4FF;
-        font-size: 1.05rem;
-        margin-bottom: 0;
-    }
-
-    .result-card {
-        background: white;
-        padding: 22px;
-        border-radius: 14px;
-        border: 1px solid #DCE6F1;
-        border-left: 6px solid #1976D2;
-        margin: 10px 0 18px 0;
-        box-shadow: 0 4px 12px rgba(16, 42, 67, 0.06);
-    }
-
-    .positive {
-        border-left-color: #16A34A;
-    }
-
-    .negative {
-        border-left-color: #DC2626;
-    }
-
-    .neutral {
-        border-left-color: #EAB308;
-    }
-
-    .result-label {
-        color: #526579;
-        font-size: 0.9rem;
-    }
-
-    .result-value {
-        color: #102A43;
-        font-size: 1.7rem;
-        font-weight: 750;
-        margin-top: 5px;
-    }
-
-    h1, h2, h3 {
-        color: #163A63;
-    }
-
-    div[data-testid="stMetric"] {
-        background: white;
-        border: 1px solid #DCE6F1;
-        padding: 14px;
-        border-radius: 12px;
-    }
-
-    div.stButton > button {
-        background-color: #1565C0;
-        color: white;
-        border: none;
-        border-radius: 9px;
-        font-weight: 600;
-        padding: 10px 18px;
-    }
-
-    div.stButton > button:hover {
-        background-color: #0D47A1;
-        color: white;
-    }
-
-    div[data-testid="stExpander"] {
-        background: white;
-        border: 1px solid #DCE6F1;
-        border-radius: 10px;
-    }
-
-    .footer {
-        text-align: center;
-        color: #627D98;
-        font-size: 0.85rem;
-        padding: 15px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
+    Analyze product reviews using Machine Learning and
+    understand whether the expressed sentiment is positive,
+    negative, or neutral.
+    """
 )
 
-# =====================================================
-# LOAD MODEL AND METRICS
-# =====================================================
-
-@st.cache_resource
-def load_model():
-    return joblib.load(MODEL_PATH)
+st.divider()
 
 
-@st.cache_data
-def load_metrics():
-    if not os.path.exists(METRICS_PATH):
-        return None
+# =========================================================
+# CHECK MODEL AVAILABILITY
+# =========================================================
 
-    with open(METRICS_PATH, "r") as file:
-        return json.load(file)
+if model is None:
 
-
-if not os.path.exists(MODEL_PATH):
     st.error(
         "The trained model file was not found. "
-        "Check that sentiment_pipeline.joblib is in your repository."
+        "Please ensure `sentiment_pipeline.joblib` "
+        "is present in the project folder."
     )
+
     st.stop()
 
-try:
-    model = load_model()
-except Exception as error:
-    st.error(f"Could not load the model: {error}")
-    st.stop()
 
-try:
-    metrics = load_metrics()
-except Exception as error:
-    metrics = None
-    st.warning(f"Could not read model metrics: {error}")
+# =========================================================
+# APPLICATION TABS
+# =========================================================
 
-# =====================================================
-# WELCOME SECTION
-# =====================================================
-
-st.markdown(
-    """
-    <div class="hero">
-        <h1>🛍️ ReviewSense AI</h1>
-        <p><b>Understand customer opinions with Sentiment Analysis</b></p>
-        <p>
-        Analyze product reviews using Natural Language Processing
-        and Machine Learning.
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# =====================================================
-# NAVIGATION
-# =====================================================
-
-tab_home, tab_history, tab_performance, tab_about = st.tabs(
+tab1, tab2, tab3, tab4 = st.tabs(
     [
-        "🏠 Analyze Reviews",
+        "🔍 Analyze Reviews",
         "🕘 Recent History",
-        "📊 Model Performance",
+        "📈 Model Performance",
         "ℹ️ About Project"
     ]
 )
 
-# =====================================================
-# TAB 1: REVIEW ANALYSIS
-# =====================================================
 
-with tab_home:
+# =========================================================
+# TAB 1: ANALYZE REVIEWS
+# =========================================================
+
+with tab1:
 
     st.subheader("🔍 Analyze a Product Review")
 
     st.write(
-        "Enter a review or select an example to see the model's prediction."
+        "Enter a product review below to predict its sentiment."
     )
 
-    examples = {
-        "Positive example":
-            "The product quality is excellent and delivery was fast.",
-
-        "Negative example":
-            "The product stopped working after two days.",
-
-        "Neutral example":
-            "The product is average and works as expected."
-    }
-
-    choice = st.selectbox(
-        "Try an example (optional)",
-        ["-- Write my own review --"] + list(examples.keys())
+    selected_example = st.selectbox(
+        "Choose an example review (optional)",
+        ["Custom Review"] + list(example_reviews.keys())
     )
+
+    if selected_example != "Custom Review":
+
+        default_review = example_reviews[selected_example]
+
+    else:
+
+        default_review = ""
 
     review = st.text_area(
-        "Enter your product review:",
-        value=examples.get(choice, ""),
-        height=130,
-        placeholder="Type your product review here..."
+        "Enter your review",
+        value=default_review,
+        height=150,
+        placeholder=(
+            "Example: The product quality is excellent "
+            "and I am very satisfied."
+        ),
+        key="review_input"
     )
 
-    predict_clicked = st.button(
-        "🔎 Predict Sentiment",
+    analyze_button = st.button(
+        "Analyze Sentiment",
         type="primary",
         use_container_width=True
     )
 
-    if predict_clicked:
+
+    # -----------------------------------------------------
+    # PREDICT SENTIMENT
+    # -----------------------------------------------------
+
+    if analyze_button:
 
         if not review.strip():
-            st.warning("Please enter a review first.")
+
+            st.warning(
+                "Please enter a review before analyzing."
+            )
 
         else:
+
             try:
-                prediction = str(model.predict([review])[0])
 
-                # Use probabilities only when the model supports them.
+                prediction = str(
+                    model.predict([review])[0]
+                )
+
+                probabilities = None
+
                 if hasattr(model, "predict_proba"):
-                    probabilities = model.predict_proba([review])[0]
-                    classes = list(model.classes_)
 
-                    confidence = float(
-                        probabilities[classes.index(prediction)]
-                    )
+                    probabilities = model.predict_proba(
+                        [review]
+                    )[0]
 
-                    probability_df = pd.DataFrame({
-                        "Sentiment": classes,
-                        "Probability (%)": probabilities * 100
-                    })
+                    if hasattr(model, "classes_"):
+
+                        classes = model.classes_
+
+                    elif hasattr(
+                        model,
+                        "named_steps"
+                    ):
+
+                        classes = None
+
+                        for step in model.named_steps.values():
+
+                            if hasattr(step, "classes_"):
+
+                                classes = step.classes_
+
+                        if classes is None:
+                            classes = []
+
+                    else:
+
+                        classes = []
 
                 else:
-                    confidence = None
-                    probability_df = None
 
-                # Save result in session history.
-                st.session_state.last_result = {
-                    "review": review,
-                    "prediction": prediction,
-                    "confidence": confidence
+                    classes = []
+
+
+                # Save the latest result
+
+                result = {
+                    "Review": review.strip(),
+                    "Predicted Sentiment": prediction
                 }
+
+                st.session_state.last_result = result
+
+
+                # Add prediction to session history
 
                 st.session_state.history.insert(
                     0,
-                    {
-                        "Review": review,
-                        "Predicted Sentiment": prediction
-                    }
+                    result.copy()
                 )
 
-                # Keep the latest 10 reviews only.
+                # Keep only the 10 most recent predictions
+
                 st.session_state.history = (
                     st.session_state.history[:10]
                 )
 
+
+                # Store probability information
+
+                if (
+                    probabilities is not None
+                    and len(classes) == len(probabilities)
+                ):
+
+                    probability_df = pd.DataFrame(
+                        {
+                            "Sentiment": [
+                                str(label)
+                                for label in classes
+                            ],
+                            "Probability": [
+                                float(value)
+                                for value in probabilities
+                            ]
+                        }
+                    )
+
+                    st.session_state.last_result[
+                        "probability_df"
+                    ] = probability_df
+
+
             except Exception as error:
-                st.error(f"Prediction failed: {error}")
 
-    # Keep results visible after Streamlit reruns.
-    result = st.session_state.last_result
+                st.error(
+                    f"Unable to analyze the review: {error}"
+                )
 
-    if result is not None:
 
-        prediction = result["prediction"]
-        confidence = result["confidence"]
+    # -----------------------------------------------------
+    # DISPLAY LATEST PREDICTION
+    # -----------------------------------------------------
+
+    if st.session_state.last_result is not None:
+
+        result = st.session_state.last_result
 
         st.divider()
-        st.subheader("🎯 Prediction Result")
 
-        style_class = {
-            "Positive": "positive",
-            "Negative": "negative",
-            "Neutral": "neutral"
-        }.get(prediction, "")
+        st.subheader("🧠 Sentiment Analysis Result")
 
-        sentiment_display = {
-            "Positive": "🟢 Positive Review",
-            "Negative": "🔴 Negative Review",
-            "Neutral": "🟡 Neutral Review"
-        }.get(prediction, f"📊 {prediction}")
+        prediction = result["Predicted Sentiment"]
 
-        explanation = {
-            "Positive":
-                "The model classified this review as expressing a positive opinion.",
-            "Negative":
-                "The model classified this review as expressing a negative opinion.",
-            "Neutral":
-                "The model classified this review as expressing a neutral or mixed opinion."
-        }.get(
-            prediction,
-            "The model returned a sentiment classification."
-        )
+        sentiment_lower = prediction.lower()
 
-        st.markdown(
-            f"""
-            <div class="result-card {style_class}">
-                <div class="result-label">Predicted Sentiment</div>
-                <div class="result-value">{sentiment_display}</div>
-                <p>{explanation}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        if "positive" in sentiment_lower:
 
-        if confidence is not None:
-            col1, col2 = st.columns(2)
-
-            col1.metric(
-                "Prediction Confidence",
-                f"{confidence * 100:.2f}%"
+            st.success(
+                f"Predicted Sentiment: {prediction}"
             )
 
-            col2.metric(
-                "Predicted Class",
-                prediction
+        elif "negative" in sentiment_lower:
+
+            st.error(
+                f"Predicted Sentiment: {prediction}"
             )
 
-            st.caption(
-                "Confidence is the model's estimated probability for "
-                "the predicted class. It is not the same as accuracy "
-                "and is not necessarily a calibrated probability."
+        elif "neutral" in sentiment_lower:
+
+            st.info(
+                f"Predicted Sentiment: {prediction}"
             )
 
-        if (
-            hasattr(model, "predict_proba")
-            and probability_df is not None
-        ):
-            st.subheader("📊 Sentiment Probability")
+        else:
+
+            st.info(
+                f"Predicted Sentiment: {prediction}"
+            )
+
+
+        # -------------------------------------------------
+        # PROBABILITY CHART
+        # -------------------------------------------------
+
+        if "probability_df" in result:
+
+            st.subheader("📊 Prediction Confidence")
+
+            probability_df = result["probability_df"].copy()
+
+            probability_df["Probability (%)"] = (
+                probability_df["Probability"] * 100
+            ).round(2)
 
             st.bar_chart(
-                probability_df.set_index("Sentiment")
+                probability_df.set_index("Sentiment")[
+                    "Probability (%)"
+                ]
             )
 
-        # =================================================
-        # SENTIMENT DISTRIBUTION
-        # =================================================
-
-        st.divider()
-        st.subheader("📊 Dataset Sentiment Distribution")
-
-        if os.path.exists(DISTRIBUTION_PATH):
-            st.image(
-                DISTRIBUTION_PATH,
-                caption="Sentiment distribution in the dataset",
-                use_container_width=True
-            )
-        else:
-            st.info(
-                "The class_distribution.png file is not available. "
-                "Add the existing dataset distribution chart to your "
-                "repository to display it here."
+            st.dataframe(
+                probability_df[
+                    ["Sentiment", "Probability (%)"]
+                ],
+                use_container_width=True,
+                hide_index=True
             )
 
-# =====================================================
-# TAB 2: RECENT HISTORY
-# =====================================================
 
-with tab_history:
+    # =====================================================
+    # DYNAMIC SENTIMENT DISTRIBUTION
+    # =====================================================
 
-    st.subheader("🕘 Recent Analysis History")
+    st.divider()
 
-    st.write(
-        "This history is stored only for the current app session. "
-        "It is not permanently saved."
+    st.subheader("📊 Sentiment Distribution")
+
+    st.caption(
+        "This chart updates as you analyze reviews. "
+        "It shows the predicted sentiments of the "
+        "reviews analyzed during the current session."
     )
+
+    if st.session_state.history:
+
+        # Convert prediction history into a DataFrame
+
+        distribution_df = pd.DataFrame(
+            st.session_state.history
+        )
+
+        # Count each predicted sentiment
+
+        sentiment_counts = (
+            distribution_df["Predicted Sentiment"]
+            .value_counts()
+        )
+
+        # Include common sentiment categories, even if their
+        # count is zero.
+
+        standard_labels = [
+            "Positive",
+            "Negative",
+            "Neutral"
+        ]
+
+        existing_labels = sentiment_counts.index.tolist()
+
+        all_labels = standard_labels + [
+            label
+            for label in existing_labels
+            if label not in standard_labels
+        ]
+
+        sentiment_counts = sentiment_counts.reindex(
+            all_labels,
+            fill_value=0
+        )
+
+        # Prepare chart data
+
+        chart_df = (
+            sentiment_counts
+            .rename_axis("Sentiment")
+            .reset_index(name="Number of Reviews")
+        )
+
+        # Display dynamic bar chart
+
+        st.bar_chart(
+            chart_df.set_index("Sentiment")
+        )
+
+        # Display exact counts
+
+        st.subheader("Sentiment Counts")
+
+        st.dataframe(
+            chart_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        total_reviews = len(distribution_df)
+
+        st.metric(
+            "Total Reviews Analyzed",
+            total_reviews
+        )
+
+    else:
+
+        st.info(
+            "No reviews analyzed yet. Enter a review and "
+            "click 'Analyze Sentiment' to generate the chart."
+        )
+
+
+# =========================================================
+# TAB 2: RECENT HISTORY
+# =========================================================
+
+with tab2:
+
+    st.subheader("🕘 Recent Review History")
 
     if st.session_state.history:
 
@@ -416,168 +469,233 @@ with tab_history:
         )
 
         st.dataframe(
-            history_df,
+            history_df[
+                ["Review", "Predicted Sentiment"]
+            ],
             use_container_width=True,
             hide_index=True
         )
 
-        if st.button("🗑️ Clear History"):
+        if st.button("Clear History"):
+
             st.session_state.history = []
+
             st.session_state.last_result = None
+
             st.rerun()
 
     else:
+
         st.info(
-            "No reviews analyzed in this session yet. "
-            "Submit a review in the Analyze Reviews tab to begin."
+            "No reviews have been analyzed in this session yet."
         )
 
-# =====================================================
-# TAB 3: MODEL PERFORMANCE
-# =====================================================
 
-with tab_performance:
+# =========================================================
+# TAB 3: MODEL PERFORMANCE
+# =========================================================
+
+with tab3:
 
     st.subheader("📈 Model Performance")
-    st.write(
-        "These metrics summarize the trained model's performance "
-        "on the held-out test dataset."
-    )
 
-    if metrics is not None:
+    if metrics:
 
-        # First row
-        c1, c2, c3, c4 = st.columns(4)
+        # Display key metrics
 
-        c1.metric(
-            "Accuracy",
-            f"{metrics['accuracy'] * 100:.2f}%"
+        col1, col2, col3 = st.columns(3)
+
+        accuracy = metrics.get("accuracy")
+
+        if accuracy is not None:
+
+            col1.metric(
+                "Accuracy",
+                f"{accuracy * 100:.2f}%"
+            )
+
+        macro_f1 = metrics.get("macro_f1")
+
+        if macro_f1 is not None:
+
+            col2.metric(
+                "Macro F1-Score",
+                f"{macro_f1:.4f}"
+            )
+
+        weighted_f1 = metrics.get("weighted_f1")
+
+        if weighted_f1 is not None:
+
+            col3.metric(
+                "Weighted F1-Score",
+                f"{weighted_f1:.4f}"
+            )
+
+
+        # Additional performance metrics
+
+        st.subheader("Detailed Metrics")
+
+        metrics_df = pd.DataFrame(
+            [
+                {
+                    "Metric": key.replace("_", " ").title(),
+                    "Value": value
+                }
+                for key, value in metrics.items()
+            ]
         )
 
-        c2.metric(
-            "Macro Precision",
-            f"{metrics['macro_precision'] * 100:.2f}%"
+        st.dataframe(
+            metrics_df,
+            use_container_width=True,
+            hide_index=True
         )
 
-        c3.metric(
-            "Macro Recall",
-            f"{metrics['macro_recall'] * 100:.2f}%"
-        )
 
-        c4.metric(
-            "Macro F1-Score",
-            f"{metrics['macro_f1'] * 100:.2f}%"
-        )
+        # Training and testing information
 
-        # Second row
-        c5, c6, c7 = st.columns(3)
+        n_train = metrics.get("n_train")
 
-        c5.metric(
-            "Weighted Precision",
-            f"{metrics['weighted_precision'] * 100:.2f}%"
-        )
+        n_test = metrics.get("n_test")
 
-        c6.metric(
-            "Weighted Recall",
-            f"{metrics['weighted_recall'] * 100:.2f}%"
-        )
+        if n_train is not None or n_test is not None:
 
-        c7.metric(
-            "Weighted F1-Score",
-            f"{metrics['weighted_f1'] * 100:.2f}%"
-        )
+            st.subheader("Dataset Information")
 
-        st.caption(
-            f"Training samples: {metrics['n_train']:,} | "
-            f"Testing samples: {metrics['n_test']:,}"
-        )
+            col1, col2 = st.columns(2)
+
+            if n_train is not None:
+
+                col1.metric(
+                    "Training Samples",
+                    f"{n_train:,}"
+                )
+
+            if n_test is not None:
+
+                col2.metric(
+                    "Testing Samples",
+                    f"{n_test:,}"
+                )
 
     else:
+
         st.warning(
-            "Performance metrics could not be loaded. "
-            "Check that metrics.json exists in the repository."
+            "Model metrics are unavailable. "
+            "Ensure that `metrics.json` is present "
+            "in the project folder."
         )
+
+
+    # -----------------------------------------------------
+    # CONFUSION MATRIX
+    # -----------------------------------------------------
 
     st.divider()
-    st.subheader("🧮 Confusion Matrix")
+
+    st.subheader("Confusion Matrix")
 
     if os.path.exists(CONFUSION_PATH):
+
         st.image(
             CONFUSION_PATH,
-            caption="Confusion matrix from model evaluation",
+            caption="Confusion Matrix of the Trained Model",
             use_container_width=True
         )
+
     else:
+
         st.info(
-            "The confusion_matrix.png file is not available. "
-            "Add the existing confusion matrix image to your "
-            "repository to display it here."
+            "The confusion matrix image was not found. "
+            "Ensure `confusion_matrix.png` is present "
+            "in the project folder."
         )
 
-# =====================================================
-# TAB 4: ABOUT PROJECT
-# =====================================================
 
-with tab_about:
+    # -----------------------------------------------------
+    # ORIGINAL DATASET DISTRIBUTION
+    # -----------------------------------------------------
+
+    st.divider()
+
+    st.subheader("Original Dataset Sentiment Distribution")
+
+    if os.path.exists(DISTRIBUTION_PATH):
+
+        st.image(
+            DISTRIBUTION_PATH,
+            caption=(
+                "Sentiment distribution in the original dataset"
+            ),
+            use_container_width=True
+        )
+
+    else:
+
+        st.info(
+            "The original dataset distribution image "
+            "`class_distribution.png` was not found."
+        )
+
+
+# =========================================================
+# TAB 4: ABOUT PROJECT
+# =========================================================
+
+with tab4:
 
     st.subheader("ℹ️ About ReviewSense AI")
 
     st.write(
         """
-        ReviewSense AI is a sentiment analysis application that
-        classifies product reviews into Positive, Negative, or Neutral
-        categories using a trained machine learning pipeline.
+        **ReviewSense AI** is a machine learning application
+        designed to analyze the sentiment expressed in
+        product reviews.
         """
     )
-
-    st.markdown("### 🛠️ Technologies Used")
-
-    technologies = [
-        ("Python", "Programming language used to build the project."),
-        ("Pandas", "Used to organize and process tabular data."),
-        ("Scikit-learn", "Used for text processing and machine learning."),
-        ("TF-IDF", "Converts review text into numerical features."),
-        ("Logistic Regression", "Classifies the processed review text."),
-        ("Streamlit", "Builds the interactive web application."),
-        ("Joblib", "Loads the saved trained model.")
-    ]
-
-    for technology, description in technologies:
-        st.markdown(f"**{technology}** — {description}")
-
-    st.markdown("### ⚙️ How It Works")
 
     st.markdown(
         """
-        1. **Input:** A user enters a product review.
-        2. **Text processing:** The trained pipeline converts the text
-           into numerical features using its configured preprocessing.
-        3. **Prediction:** The trained classifier predicts a sentiment.
-        4. **Results:** The app displays the prediction and, when
-           available, estimated class probabilities.
-        5. **Evaluation:** The saved test metrics summarize model
-           performance on the evaluation dataset.
+        ### Project Objectives
+
+        - Analyze the text of product reviews.
+        - Predict the sentiment expressed in a review.
+        - Display prediction confidence when supported by
+          the trained model.
+        - Maintain a history of recently analyzed reviews.
+        - Visualize the distribution of predicted sentiments.
+        - Present model evaluation metrics and performance
+          visualizations.
+
+        ### Technologies Used
+
+        - Python
+        - Streamlit
+        - Pandas
+        - Scikit-learn
+        - Joblib
+        - Machine Learning
+
+        ### Project Files
+
+        - `app (1).py` — Streamlit application
+        - `sentiment_pipeline.joblib` — Trained model pipeline
+        - `metrics.json` — Model evaluation metrics
+        - `confusion_matrix.png` — Confusion matrix
+        - `class_distribution.png` — Original dataset
+          sentiment distribution
         """
     )
 
-    st.info(
-        "The application uses the saved trained pipeline. "
-        "It does not retrain the model for each review."
-    )
 
-# =====================================================
+# =========================================================
 # FOOTER
-# =====================================================
+# =========================================================
 
 st.divider()
 
-st.markdown(
-    """
-    <div class="footer">
-        <b>ReviewSense AI</b><br>
-        Sentiment Analysis of Product Reviews<br>
-        A Machine Learning Mini Project
-    </div>
-    """,
-    unsafe_allow_html=True
+st.caption(
+    "ReviewSense AI | Sentiment Analysis of Product Reviews"
 )
